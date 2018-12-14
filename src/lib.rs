@@ -100,7 +100,7 @@ pub fn schedule_eval(expr: String, vals: JsValue) -> js_sys::Promise {
 }
 
 /// Evals the given expression
-/// If the expression can't be evaled Null is returned
+/// If the expression can't be evaled UNDEFINED is returned
 #[wasm_bindgen]
 pub fn eval_syn(expr: &str, vals: JsValue) -> JsValue {
     let _timer = Timer::new("eval_test");

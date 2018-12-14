@@ -1,6 +1,7 @@
 #[macro_use] extern crate lazy_static;
 extern crate futures;
 extern crate js_sys;
+extern crate web_sys;
 extern crate wasm_bindgen;
 extern crate wasm_bindgen_futures;
 extern crate regex;
@@ -12,17 +13,31 @@ use wasm_bindgen_futures::{JsFuture, future_to_promise};
 use regex::{Regex, Captures};
 use std::error;
 use eval::eval;
+use web_sys::console::{log_1, time_with_label, time_end_with_label};
 
 type Integer = i32;
 
-#[wasm_bindgen]
-extern {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(msg: &str);
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        log_1(&format!( $( $t )* ).into());
+    }
 }
 
-macro_rules! log {
-    ($($t:tt)*) => (log(&format!($($t)*)))
+pub struct Timer<'a> {
+    name: &'a str,
+}
+
+impl<'a> Timer<'a> {
+    pub fn new(name: &'a str) -> Timer<'a> {
+        time_with_label(name);
+        Timer { name }
+    }
+}
+
+impl<'a> Drop for Timer<'a> {
+    fn drop(&mut self) {
+        time_end_with_label(self.name);
+    }
 }
 
 /// A future that becomes ready after a tick of the micro task queue.
@@ -63,18 +78,18 @@ impl Future for NextTick {
 /// Export a function to JavaScript that does some work in the next tick of the
 /// micro task queue!
 #[wasm_bindgen]
-pub fn schedule_eval(expr: String, vals: Vec<Integer>) -> js_sys::Promise {
+pub fn schedule_eval(expr: String, vals: JsValue) -> js_sys::Promise {
     let future = NextTick::new()
         // Do some work...
         .and_then(move |_| {
-           Ok(eval(&insert_values(&expr, &vals).unwrap()).unwrap())
+           let elements: Vec<String> = vals.into_serde().unwrap();
+           Ok(eval(&insert_values(&expr, &elements).unwrap()).unwrap())
         })
         // And then convert the `Item` and `Error` into `JsValue`.
         .map(|result| {
             JsValue::from_serde(&result).unwrap()
         })
         .map_err(|error| {
-            log!("{:?}", error);
             let js_error = js_sys::Error::new(&format!("uh oh! {:?}", error));
             JsValue::from(js_error)
         });
@@ -87,27 +102,30 @@ pub fn schedule_eval(expr: String, vals: Vec<Integer>) -> js_sys::Promise {
 /// Evals the given expression
 /// If the expression can't be evaled Null is returned
 #[wasm_bindgen]
-pub fn eval_syn(expr: &str, vals: &[Integer]) -> JsValue {
-    let mut res = JsValue::NULL;
-    if let Ok(expr) = insert_values(expr, vals) {
-        if let Ok(evaled) = eval(&expr) {
-            if let Ok(final_res) = JsValue::from_serde(&evaled) {
-                res = final_res;
+pub fn eval_syn(expr: &str, vals: JsValue) -> JsValue {
+    let _timer = Timer::new("eval_test");
+    let mut res = JsValue::UNDEFINED;
+
+    if let Ok(elements) = vals.into_serde::<Vec<String>>() {
+        if let Ok(expr) = insert_values(expr, &elements) {
+            if let Ok(evaled) = eval(&expr) {
+                if let Ok(final_res) = JsValue::from_serde(&evaled) {
+                    res = final_res;
+                }
             }
         }
     }
     res
 }
 
-fn insert_values(expr: &str, vals: &[Integer]) -> Result<String, Box<error::Error>> {
+fn insert_values(expr: &str, vals: &[String]) -> Result<String, Box<error::Error>> {
     lazy_static! {
         static ref RE: Regex = Regex::new(r"(\{})").unwrap();
     }
-    log!("{:#?}", vals);
     let mut idx = 0;
     let result = RE.replace_all(expr, |caps: &Captures| {
         println!("{:?}", caps);
-        let replacement = vals[idx].to_string();
+        let replacement = &vals[idx];
         idx = idx + 1;
         replacement
     }).to_string();
@@ -132,7 +150,7 @@ mod tests {
 
     #[test]
     fn should_insert_numbers() {
-        let nums = [1, 2, 3];
+        let nums = [String::from("1"),String::from("2"), String::from("3")];
         let expr = String::from("{} + {} * {}");
         assert_eq!(insert_values(&expr, &nums).unwrap(), "1 + 2 * 3");
     }
@@ -140,14 +158,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn should_panic_when_value_size_does_not_match() {
-        let nums = [1, 2];
+        let nums = [String::from("1"), String::from("2")];
         let expr = String::from("{} + {} * {}");
         insert_values(&expr, &nums).unwrap();
     }
 
     #[test]
     fn should_eval_string() {
-        let nums = [1, 2, 3];
+        let nums = [String::from("1"),String::from("2"), String::from("3")];
         let expr = String::from("{} + {} * {}");
         assert_eq!(eval(&insert_values(&expr, &nums).unwrap()), Ok(to_value(7)));
     }

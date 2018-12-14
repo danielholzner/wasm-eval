@@ -8,7 +8,7 @@ operators are:
 
  See for supported operators.
 ## Requirements
-You web-server must support the `application/wasm` Mime-Type.
+Your web-server must support the `application/wasm` Mime-Type.
 
 Example for Jetty:
 ```java

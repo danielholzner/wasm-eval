@@ -1,9 +1,10 @@
 [package]
 name = "wasm-eval"
 version = "0.1.0"
-authors = ["Daniel.Holzner <danielholzner@gmx.de>"]
+authors = ["Daniel.Holzner <daniel.holzner@gefasoft.de>"]
 description = "Code used to demonstrate how to use wasm-pack"
 license = "MIT/Apache-2.0"
+repository = "https://github.com/danielholzner/wasm-eval"
 
 [dependencies]
 eval = "0.4"
@@ -16,6 +17,12 @@ lazy_static = "1"
 [dependencies.wasm-bindgen]
 version= "0.2"
 features = ["serde-serialize"]
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "console"
+]
 
 [lib]
 crate-type = ["cdylib"]

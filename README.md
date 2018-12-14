@@ -1,5 +1,5 @@
 ## Description
-This crate can evaluate expressions like `("{} + {} * {}", [1,2,3])`. It was developed to eval JavaScript-code of the client in a safe context.
+This crate can evaluate expressions like `("{} + {} * {}", ["1","2","3"])`. It was developed to eval JavaScript-code of the client in a safe context.
 
 The crate is based on the Rust [eval](https://docs.rs/eval)-crate and its supported 
 operators are:
@@ -24,7 +24,7 @@ Import the wasm-module into your app (e.g. import in ember via [ember-auto-impor
 (async () => {
     // Importing wasm module
     const { eval_syn, schedule_eval } = await import('wasm-eval')
-    const values = [1, 2, 3];
+    const values = ["1", "2," "3"];
     const expr = "{} + {} * {}";
 
     //eval_syn returns the value directly

@@ -13,45 +13,15 @@ use wasm_bindgen_futures::{JsFuture, future_to_promise};
 use regex::{Regex, Captures};
 use std::error;
 use eval::eval;
-use web_sys::console::{log_1, time_with_label, time_end_with_label};
 
-type Integer = i32;
 
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        log_1(&format!( $( $t )* ).into());
-    }
-}
-
-pub struct Timer<'a> {
-    name: &'a str,
-}
-
-impl<'a> Timer<'a> {
-    pub fn new(name: &'a str) -> Timer<'a> {
-        time_with_label(name);
-        Timer { name }
-    }
-}
-
-impl<'a> Drop for Timer<'a> {
-    fn drop(&mut self) {
-        time_end_with_label(self.name);
-    }
-}
-
-/// A future that becomes ready after a tick of the micro task queue.
 pub struct NextTick {
     inner: JsFuture,
 }
 
 impl NextTick {
-    /// Construct a new `NextTick` future.
     pub fn new() -> NextTick {
-        // Create a resolved promise that will run its callbacks on the next
-        // tick of the micro task queue.
         let promise = js_sys::Promise::resolve(&JsValue::NULL);
-        // Convert the promise into a `JsFuture`.
         let inner = JsFuture::from(promise);
         NextTick { inner }
     }
@@ -62,8 +32,6 @@ impl Future for NextTick {
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), ()> {
-        // Polling a `NextTick` just forwards to polling if the inner promise is
-        // ready.
         match self.inner.poll() {
             Ok(Async::Ready(_)) => Ok(Async::Ready(())),
             Ok(Async::NotReady) => Ok(Async::NotReady),
@@ -75,17 +43,14 @@ impl Future for NextTick {
     }
 }
 
-/// Export a function to JavaScript that does some work in the next tick of the
-/// micro task queue!
+/// Returns Javascript Promise
 #[wasm_bindgen]
 pub fn schedule_eval(expr: String, vals: JsValue) -> js_sys::Promise {
     let future = NextTick::new()
-        // Do some work...
         .and_then(move |_| {
            let elements: Vec<String> = vals.into_serde().unwrap();
            Ok(eval(&insert_values(&expr, &elements).unwrap()).unwrap())
         })
-        // And then convert the `Item` and `Error` into `JsValue`.
         .map(|result| {
             JsValue::from_serde(&result).unwrap()
         })
@@ -94,8 +59,6 @@ pub fn schedule_eval(expr: String, vals: JsValue) -> js_sys::Promise {
             JsValue::from(js_error)
         });
 
-    // Convert the `Future<Item = JsValue, Error = JsValue>` into a JavaScript
-    // `Promise`!
     future_to_promise(future)
 }
 
@@ -103,7 +66,6 @@ pub fn schedule_eval(expr: String, vals: JsValue) -> js_sys::Promise {
 /// If the expression can't be evaled UNDEFINED is returned
 #[wasm_bindgen]
 pub fn eval_syn(expr: &str, vals: JsValue) -> JsValue {
-    let _timer = Timer::new("eval_test");
     let mut res = JsValue::UNDEFINED;
 
     if let Ok(elements) = vals.into_serde::<Vec<String>>() {
@@ -123,8 +85,7 @@ fn insert_values(expr: &str, vals: &[String]) -> Result<String, Box<error::Error
         static ref RE: Regex = Regex::new(r"(\{})").unwrap();
     }
     let mut idx = 0;
-    let result = RE.replace_all(expr, |caps: &Captures| {
-        println!("{:?}", caps);
+    let result = RE.replace_all(expr, |_caps: &Captures| {
         let replacement = &vals[idx];
         idx = idx + 1;
         replacement

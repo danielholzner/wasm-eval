@@ -37,7 +37,7 @@ Import the wasm-module into your app (e.g. import in ember via [ember-auto-impor
     schedule_eval(expr, values).then(res => {
         if(res) {
             console.log(res); // 7
-        } else { // null is returned on parse error
+        } else { // undefined is returned on parse error
             console.log("Could not parse expression");
         }
     });
